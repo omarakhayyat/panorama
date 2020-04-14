@@ -5,27 +5,30 @@ import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_cube/flutter_cube.dart';
+import 'package:sensors/sensors.dart';
 
 class Panorama extends StatefulWidget {
-  Panorama({
-    Key key,
-    this.latitude = 0,
-    this.longitude = 0,
-    this.zoom = 1.0,
-    this.minLatitude = -90.0,
-    this.maxLatitude = 90.0,
-    this.minLongitude = -180.0,
-    this.maxLongitude = 180.0,
-    this.minZoom = 1.0,
-    this.maxZoom = 5.0,
-    this.sensitivity = 1.0,
-    this.animSpeed = 1.0,
-    this.animReverse = true,
-    this.latSegments = 32,
-    this.lonSegments = 64,
-    this.interactive = true,
-    this.child,
-  }) : super(key: key);
+  Panorama(
+      {Key key,
+      this.latitude = 0,
+      this.longitude = 0,
+      this.zoom = 1.0,
+      this.minLatitude = -90.0,
+      this.maxLatitude = 90.0,
+      this.minLongitude = -180.0,
+      this.maxLongitude = 180.0,
+      this.minZoom = 1.0,
+      this.maxZoom = 5.0,
+      this.sensitivity = 1.0,
+      this.animSpeed = 1.0,
+      this.animReverse = true,
+      this.latSegments = 32,
+      this.lonSegments = 64,
+      this.interactive = true,
+      this.gyroscope,
+      this.child,
+      this.isCompass})
+      : super(key: key);
 
   /// The initial latitude, in degrees, between -90 and 90. default to 0
   final double latitude;
@@ -75,11 +78,15 @@ class Panorama extends StatefulWidget {
   /// Specify an Image(equirectangular image) widget to the panorama.
   final Image child;
 
+  final bool isCompass;
+  final Stream gyroscope;
+
   @override
   _PanoramaState createState() => _PanoramaState();
 }
 
-class _PanoramaState extends State<Panorama> with SingleTickerProviderStateMixin {
+class _PanoramaState extends State<Panorama>
+    with SingleTickerProviderStateMixin {
   Scene scene;
   double latitude;
   double longitude;
@@ -92,6 +99,9 @@ class _PanoramaState extends State<Panorama> with SingleTickerProviderStateMixin
   double _dampingFactor = 0.05;
   double _animateDirection = 1.0;
   AnimationController _controller;
+  List<StreamSubscription<dynamic>> _streamSubscriptions =
+      <StreamSubscription<dynamic>>[];
+  List<double> _gyroscopeValues;
 
   void _handleScaleStart(ScaleStartDetails details) {
     _lastFocalPoint = details.localFocalPoint;
@@ -101,8 +111,17 @@ class _PanoramaState extends State<Panorama> with SingleTickerProviderStateMixin
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     final offset = details.localFocalPoint - _lastFocalPoint;
     _lastFocalPoint = details.localFocalPoint;
-    latitudeDelta += widget.sensitivity * 0.5 * math.pi * offset.dy / scene.camera.viewportHeight;
-    longitudeDelta -= widget.sensitivity * _animateDirection * 0.5 * math.pi * offset.dx / scene.camera.viewportHeight;
+    latitudeDelta += widget.sensitivity *
+        0.5 *
+        math.pi *
+        offset.dy /
+        scene.camera.viewportHeight;
+    longitudeDelta -= widget.sensitivity *
+        _animateDirection *
+        0.5 *
+        math.pi *
+        offset.dx /
+        scene.camera.viewportHeight;
     if (_lastZoom == null) {
       _lastZoom = scene.camera.zoom;
     }
@@ -127,8 +146,13 @@ class _PanoramaState extends State<Panorama> with SingleTickerProviderStateMixin
 
     if (widget.child != null) {
       loadImageFromProvider(widget.child.image).then((ui.Image image) {
-        final Mesh mesh = generateSphereMesh(radius: _radius, latSegments: widget.latSegments, lonSegments: widget.lonSegments, texture: image);
-        scene.world.add(Object(name: 'surface', mesh: mesh, backfaceCulling: false));
+        final Mesh mesh = generateSphereMesh(
+            radius: _radius,
+            latSegments: widget.latSegments,
+            lonSegments: widget.lonSegments,
+            texture: image);
+        scene.world
+            .add(Object(name: 'surface', mesh: mesh, backfaceCulling: false));
         scene.updateTexture();
       });
     }
@@ -145,26 +169,37 @@ class _PanoramaState extends State<Panorama> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
+
     latitude = widget.latitude;
     longitude = widget.longitude;
 
-    _controller = AnimationController(duration: Duration(milliseconds: 60000), vsync: this)
+    _controller = AnimationController(
+        duration: Duration(milliseconds: 60000), vsync: this)
       ..addListener(() {
         if (scene == null) return;
         longitudeDelta += 0.001 * widget.animSpeed;
-        if (latitudeDelta.abs() < 0.001 && longitudeDelta.abs() < 0.001 && zoomDelta.abs() < 0.001) {
-          if (widget.animSpeed == 0 && _controller.isAnimating) _controller.stop();
+        if (latitudeDelta.abs() < 0.001 &&
+            longitudeDelta.abs() < 0.001 &&
+            zoomDelta.abs() < 0.001) {
+          if (widget.animSpeed == 0 && _controller.isAnimating)
+            _controller.stop();
           return;
         }
+
         // animate vertical rotating
         latitude += latitudeDelta * _dampingFactor * widget.sensitivity;
         latitudeDelta *= 1 - _dampingFactor * widget.sensitivity;
-        latitude = latitude.clamp(radians(math.max(-89, widget.minLatitude)), radians(math.min(89, widget.maxLatitude)));
+        latitude = latitude.clamp(radians(math.max(-89, widget.minLatitude)),
+            radians(math.min(89, widget.maxLatitude)));
         // animate horizontal rotating
-        longitude += _animateDirection * longitudeDelta * _dampingFactor * widget.sensitivity;
+        longitude += _animateDirection *
+            longitudeDelta *
+            _dampingFactor *
+            widget.sensitivity;
         longitudeDelta *= 1 - _dampingFactor * widget.sensitivity;
         if (widget.maxLongitude - widget.minLongitude < 360) {
-          final double lon = longitude.clamp(radians(widget.minLongitude), radians(widget.maxLongitude));
+          final double lon = longitude.clamp(
+              radians(widget.minLongitude), radians(widget.maxLongitude));
           if (longitude != lon) {
             longitude = lon;
             if (widget.animSpeed != 0) {
@@ -182,6 +217,56 @@ class _PanoramaState extends State<Panorama> with SingleTickerProviderStateMixin
         setCameraTarget(latitude, longitude);
       });
     if (widget.animSpeed != 0) _controller.repeat();
+
+    _streamSubscriptions.add(
+      gyroscopeEvents.listen(
+        (GyroscopeEvent event) {
+          _gyroscopeValues = <double>[event.x, event.y, event.z];
+          print(_gyroscopeValues.elementAt(0));
+          if (widget.isCompass) {
+            latitude += _gyroscopeValues.elementAt(0) *
+                5 *
+                _dampingFactor *
+                widget.sensitivity;
+            latitudeDelta *= 1 - _dampingFactor * widget.sensitivity;
+            latitude = latitude.clamp(
+                radians(math.max(-89, widget.minLatitude)),
+                radians(math.min(89, widget.maxLatitude)));
+
+            longitude += _animateDirection *
+                (-_gyroscopeValues.elementAt(1)) *
+                5 *
+                _dampingFactor *
+                widget.sensitivity;
+            longitudeDelta *= 1 - _dampingFactor * widget.sensitivity;
+            if (widget.maxLongitude - widget.minLongitude < 360) {
+              final double lon = longitude.clamp(
+                  radians(widget.minLongitude), radians(widget.maxLongitude));
+              if (longitude != lon) {
+                longitude = lon;
+                if (widget.animSpeed != 0) {
+                  if (widget.animReverse) {
+                    _animateDirection *= -1.0;
+                  } else
+                    _controller.stop();
+                }
+              }
+            }
+            final double zoom = scene.camera.zoom + zoomDelta * _dampingFactor;
+            zoomDelta *= 1 - _dampingFactor;
+            scene.camera.zoom = zoom.clamp(widget.minZoom, widget.maxZoom);
+            if (!_controller.isAnimating) {
+              _controller.reset();
+              if (widget.animSpeed != 0) {
+                _controller.repeat();
+              } else
+                _controller.forward();
+            }
+            setCameraTarget(latitude, longitude);
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -195,13 +280,19 @@ class _PanoramaState extends State<Panorama> with SingleTickerProviderStateMixin
     super.didUpdateWidget(oldWidget);
     final Object surface = scene.world.find(RegExp('surface'));
     if (surface == null) return;
-    if (widget.latSegments != oldWidget.latSegments || widget.lonSegments != oldWidget.lonSegments) {
-      surface.mesh = generateSphereMesh(radius: _radius, latSegments: widget.latSegments, lonSegments: widget.lonSegments, texture: surface.mesh.texture);
+    if (widget.latSegments != oldWidget.latSegments ||
+        widget.lonSegments != oldWidget.lonSegments) {
+      surface.mesh = generateSphereMesh(
+          radius: _radius,
+          latSegments: widget.latSegments,
+          lonSegments: widget.lonSegments,
+          texture: surface.mesh.texture);
     }
     if (widget.child?.image != oldWidget.child?.image) {
       loadImageFromProvider(widget.child.image).then((ui.Image image) {
         surface.mesh.texture = image;
-        surface.mesh.textureRect = Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
+        surface.mesh.textureRect = Rect.fromLTWH(
+            0, 0, image.width.toDouble(), image.height.toDouble());
         scene.updateTexture();
       });
     }
@@ -219,7 +310,11 @@ class _PanoramaState extends State<Panorama> with SingleTickerProviderStateMixin
   }
 }
 
-Mesh generateSphereMesh({num radius = 1.0, int latSegments = 16, int lonSegments = 16, ui.Image texture}) {
+Mesh generateSphereMesh(
+    {num radius = 1.0,
+    int latSegments = 16,
+    int lonSegments = 16,
+    ui.Image texture}) {
   int count = (latSegments + 1) * (lonSegments + 1);
   List<Vector3> vertices = List<Vector3>(count);
   List<Offset> texcoords = List<Offset>(count);
@@ -232,7 +327,8 @@ Mesh generateSphereMesh({num radius = 1.0, int latSegments = 16, int lonSegments
     final double cv = math.cos(v * math.pi);
     for (int x = 0; x <= lonSegments; ++x) {
       final double u = x / lonSegments;
-      vertices[i] = Vector3(radius * math.cos(u * math.pi * 2.0) * sv, radius * cv, radius * math.sin(u * math.pi * 2.0) * sv);
+      vertices[i] = Vector3(radius * math.cos(u * math.pi * 2.0) * sv,
+          radius * cv, radius * math.sin(u * math.pi * 2.0) * sv);
       texcoords[i] = Offset(u, 1.0 - v);
       i++;
     }
@@ -248,7 +344,11 @@ Mesh generateSphereMesh({num radius = 1.0, int latSegments = 16, int lonSegments
     }
   }
 
-  final Mesh mesh = Mesh(vertices: vertices, texcoords: texcoords, indices: indices, texture: texture);
+  final Mesh mesh = Mesh(
+      vertices: vertices,
+      texcoords: texcoords,
+      indices: indices,
+      texture: texture);
   return mesh;
 }
 

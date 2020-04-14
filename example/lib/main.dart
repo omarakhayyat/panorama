@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:panorama/panorama.dart';
-import 'package:image_picker/image_picker.dart';
 
 void main() => runApp(MyApp());
 
@@ -35,13 +34,17 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Panorama(
-        animSpeed: 2.0,
-        child: _imageFile != null ? Image.file(_imageFile) : Image.asset('assets/panorama.jpg'),
+        isCompass: true,
+        animSpeed: 0.0,
+        interactive: true,
+        child: _imageFile != null
+            ? Image.file(_imageFile)
+            : Image.asset('assets/panorama.jpg'),
       ),
       floatingActionButton: FloatingActionButton(
         mini: true,
         onPressed: () async {
-          _imageFile = await ImagePicker.pickImage(source: ImageSource.gallery);
+          //_imageFile = await ImagePicker.pickImage(source: ImageSource.gallery);
           setState(() {});
         },
         child: Icon(Icons.panorama),

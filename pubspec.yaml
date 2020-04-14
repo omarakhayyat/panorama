@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_cube: ^0.0.3
+  sensors: ^0.4.1+10
 
 dev_dependencies:
   flutter_test:
