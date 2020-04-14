@@ -247,8 +247,9 @@ class _PanoramaState extends State<Panorama>
                 if (widget.animSpeed != 0) {
                   if (widget.animReverse) {
                     _animateDirection *= -1.0;
-                  } else
-                    _controller.stop();
+                  } 
+                  // else
+                  //   _controller.stop();
                 }
               }
             }
