@@ -1,6 +1,7 @@
 library panorama;
 
 import 'dart:async';
+import 'dart:html';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -222,7 +223,6 @@ class _PanoramaState extends State<Panorama>
       gyroscopeEvents.listen(
         (GyroscopeEvent event) {
           _gyroscopeValues = <double>[event.x, event.y, event.z];
-          print(_gyroscopeValues.elementAt(0));
           if (widget.isCompass) {
             latitude += _gyroscopeValues.elementAt(0) *
                 5 *
@@ -247,9 +247,8 @@ class _PanoramaState extends State<Panorama>
                 if (widget.animSpeed != 0) {
                   if (widget.animReverse) {
                     _animateDirection *= -1.0;
-                  } 
-                  // else
-                  //   _controller.stop();
+                  } else
+                    _controller.stop();
                 }
               }
             }
