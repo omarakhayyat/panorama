@@ -255,13 +255,7 @@ class _PanoramaState extends State<Panorama>
             final double zoom = scene.camera.zoom + zoomDelta * _dampingFactor;
             zoomDelta *= 1 - _dampingFactor;
             scene.camera.zoom = zoom.clamp(widget.minZoom, widget.maxZoom);
-            if (!_controller.isAnimating) {
-              _controller.reset();
-              if (widget.animSpeed != 0) {
-                _controller.repeat();
-              } else
-                _controller.forward();
-            }
+       
             setCameraTarget(latitude, longitude);
           }
         },
