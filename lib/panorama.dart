@@ -266,6 +266,7 @@ class _PanoramaState extends State<Panorama>
   @override
   void dispose() {
     _controller.dispose();
+    _streamSubscriptions.clear();
     super.dispose();
   }
 
